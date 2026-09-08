@@ -81,8 +81,11 @@ RUN groupadd -r app && useradd -r -g app -u 10001 -m app
 COPY --from=deps-builder /app /app
 
 # 数据 / 日志目录（可作为 K8s PVC 挂载）
+# 注意：只对运行时可写目录（/data、/app/logs）做 chown，不整树 chown /app ——
+# node_modules 有十万级文件，overlayfs 上 chown -R /app 会逐文件 copy-up，
+# 单次构建多花 10+ 分钟。其余文件 root 属主 + 全局可读，app 用户（tsx 运行时）只读即可。
 RUN mkdir -p /data/tdai-memory-proxy /data/config /app/logs && \
-    chown -R app:app /app /data
+    chown -R app:app /data /app/logs
 
 USER app
 

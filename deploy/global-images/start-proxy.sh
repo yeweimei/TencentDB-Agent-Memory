@@ -56,6 +56,8 @@ CONFIG_FILE="$CONFIG_DIR/config.yaml"
 # PROXY_ENABLE_TDAI        : L2/L3 记忆注入 + L1 召回；依赖 memory-core
 #
 # 便捷开关 PROXY_FULL_STACK=1 一键把三个都开。
+# PROXY_SESSION_INIT_DEFAULT_TASK_ID: 非空时在 sessionInit 段生成 defaultTaskId（如 no-task），
+#   客户端未带 x-task-id 时用它兜底，避免弹 task 选择表单。
 if [[ "${PROXY_FULL_STACK:-0}" == "1" ]]; then
   PROXY_ENABLE_AUTH=1
   PROXY_ENABLE_TDAI=1
@@ -120,12 +122,14 @@ auth:
   enabled: $(bool $PROXY_ENABLE_AUTH)
   url: "http://memory-core:8420"
   timeoutMs: 5000
+  apiKey: "${MEMORY_CORE_GATEWAY_API_KEY}"
 
 sessionInit:
   enabled: $(bool $PROXY_ENABLE_SESSION_INIT)
   maxRetries: 3
   injectAgentContext: true
   injectTaskContext: true
+$( [[ -n "${PROXY_SESSION_INIT_DEFAULT_TASK_ID:-}" ]] && printf '  defaultTaskId: "%s"' "$PROXY_SESSION_INIT_DEFAULT_TASK_ID" )
   headerAutoSelect:
     enabled: true
     teamHeader: "x-team-id"
@@ -149,13 +153,20 @@ redis:
   enabled: false
 YAML
 
-info "启动 proxy (image=$PROXY_IMAGE, port=$PROXY_PORT)"
+# proxy 的 sqlite（session 绑定 / hook 缓存）默认在容器内 /data/tdai-memory-proxy，
+# 不挂 volume 时每次重启都会丢 —— memory-bridge / skill-bridge 会对所有旧会话
+# 报 40101 session not initialized，直到下一轮主对话重新 sessionInit。
+# 挂 named volume 让绑定跨重启存活（与 memory-core 的 volume 策略一致）。
+MEMORY_PROXY_VOLUME="${MEMORY_PROXY_VOLUME:-tdai-proxy-data}"
+
+info "启动 proxy (image=$PROXY_IMAGE, port=$PROXY_PORT, volume=$MEMORY_PROXY_VOLUME)"
 $DOCKER run -d --name "$CONTAINER" \
   --network "$NETWORK" \
   --network-alias proxy \
   --add-host=host.docker.internal:host-gateway \
   -p "${PROXY_PORT}:8096" \
   -v "$CONFIG_FILE:/data/config.yaml:ro" \
+  -v "${MEMORY_PROXY_VOLUME}:/data/tdai-memory-proxy" \
   "$PROXY_IMAGE" >/dev/null
 
 wait_healthy "$CONTAINER" 90
