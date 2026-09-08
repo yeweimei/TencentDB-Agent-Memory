@@ -133,6 +133,29 @@ export class SessionStore {
   }
 
   /**
+   * Scan-based fallback for the skill/memory bridges: find an initialized
+   * state whose keyId equals `sessionId` or ends with `:${sessionId}`.
+   *
+   * Bridges only see the bare sessionId from request headers (x-conversation-id
+   * etc.) and cannot know the agentSource prefix the chat handler used when it
+   * stored the session (`${agentSource}:${sessionId}` — e.g. `openclaw:...`).
+   * The hard-coded candidate-prefix list in the bridges cannot cover every
+   * agentSource, and the L2 binding fallthrough is unavailable when Redis is
+   * disabled and the KV binding table was never populated. Scanning the
+   * in-memory map (small on single-node deployments) closes that gap.
+   */
+  findBySessionKey(sessionId: string): { keyId: string; state: SessionInitState } | undefined {
+    if (!sessionId) return undefined;
+    const direct = this.states.get(sessionId);
+    if (direct && direct.status === "initialized") return { keyId: sessionId, state: direct };
+    const suffix = `:${sessionId}`;
+    for (const [keyId, state] of this.states) {
+      if (keyId.endsWith(suffix) && state.status === "initialized") return { keyId, state };
+    }
+    return undefined;
+  }
+
+  /**
    * 把 recovery source 挂到 state 的**非可枚举**字段上——handler 侧读取
    * `state.__recoverySource` 语义不变，但 `deepEqual` / `JSON.stringify` /
    * `Object.keys` 都不会看到这一枚 transient marker，避免测试断言"恢复后

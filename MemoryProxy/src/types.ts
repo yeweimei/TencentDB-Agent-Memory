@@ -663,6 +663,14 @@ export interface AuthConfig {
   url: string;
   /** Request timeout in ms. Default: 5000. */
   timeoutMs: number;
+  /**
+   * Gateway shared secret sent as `Authorization: Bearer <apiKey>` on the
+   * auth/verify call. Required when the kernel gateway has
+   * `TDAI_GATEWAY_API_KEY` / `server.apiKey` set (all routes except
+   * GET /health are Bearer-gated). Empty string = no Authorization header
+   * (legacy open-gateway deployments).
+   */
+  apiKey: string;
 }
 
 /**
@@ -917,6 +925,7 @@ export interface RawYamlConfig {
     enabled?: boolean;
     url?: string;
     timeoutMs?: number;
+    apiKey?: string;
   };
   systemUsers?: Partial<SystemUserEntry>[];
   admin?: {

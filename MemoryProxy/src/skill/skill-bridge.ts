@@ -302,6 +302,13 @@ function loadSessionIdsL1(sessionId: string): SessionIdFields | null {
       if (fields) return fields;
     }
   }
+  // Fallback: the chat handler may have stored the session under another
+  // agentSource prefix (e.g. `openclaw:`) not covered by the candidate list.
+  const found = getSessionStore().findBySessionKey(sessionId);
+  if (found) {
+    const fields = stateToIdFields(found.state, found.keyId);
+    if (fields) return fields;
+  }
   return null;
 }
 

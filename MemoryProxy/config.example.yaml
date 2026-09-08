@@ -376,6 +376,9 @@ auth:
   enabled: true            # 是否启用鉴权
   url: "http://kernel.example.com:8420"   # 内核鉴权服务 base URL（自动拼接 /v3/meta/auth/verify）
   timeoutMs: 5000          # 鉴权请求超时（毫秒）
+  apiKey: ""               # 内核 gateway 的 Bearer 共享密钥（TDAI_GATEWAY_API_KEY / server.apiKey）。
+                           # 内核设置了 apiKey 时必填，否则 auth/verify 会被 401 拒绝；
+                           # 也可用环境变量 TDAI_AUTH_API_KEY 注入（env 优先于本字段）。留空 = 内核网关开放（legacy）。
 
 
 # ── Admin / Ops 端点鉴权（服务级 shared secret） ─────────────────────────────

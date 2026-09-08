@@ -5,6 +5,8 @@
  * - Every call goes directly to the auth service (no caching)
  * - Returns structured result to allow caller to reject invalid keys
  * - x-tdai-service-id is derived from the request path's spaceId (not config)
+ * - When `auth.apiKey` is configured, sends `Authorization: Bearer <apiKey>`
+ *   so the call passes the kernel gateway's Bearer gate (TDAI_GATEWAY_API_KEY)
  * - Configurable via YAML `auth` section
  */
 
@@ -78,6 +80,9 @@ export async function verifyUserKey(userKey: string, serviceId: string): Promise
       headers: {
         "content-type": "application/json",
         "x-tdai-service-id": serviceId,
+        // Kernel gateway Bearer gate: when TDAI_GATEWAY_API_KEY is set on the
+        // kernel, every route except GET /health requires this header.
+        ...(config.apiKey ? { Authorization: `Bearer ${config.apiKey}` } : {}),
       },
       body: JSON.stringify({ user_key: userKey }),
     };

@@ -141,6 +141,7 @@ export const DEFAULT_CONFIG: ProxyConfig = {
     enabled: false,
     url: "",
     timeoutMs: 5000,
+    apiKey: "",
   },
   systemUsers: [],
   admin: { apiKey: "" },
@@ -489,6 +490,13 @@ export function buildConfig(overrides: CliOverrides = {}): ProxyConfig {
       enabled: yaml.auth?.enabled ?? DEFAULT_CONFIG.auth.enabled,
       url: yaml.auth?.url ?? DEFAULT_CONFIG.auth.url,
       timeoutMs: yaml.auth?.timeoutMs ?? DEFAULT_CONFIG.auth.timeoutMs,
+      // Gateway shared secret for the Bearer gate (kernel TDAI_GATEWAY_API_KEY).
+      // Env wins over yaml so deployments can inject it without touching the
+      // config file; empty = open gateway (legacy behaviour).
+      apiKey:
+        (process.env.TDAI_AUTH_API_KEY ?? "").trim() ||
+        yaml.auth?.apiKey ||
+        DEFAULT_CONFIG.auth.apiKey,
     },
     // Entries without a non-empty userId are silently dropped — matching is
     // by userId now, and an empty userId would otherwise collide with
