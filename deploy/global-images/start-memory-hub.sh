@@ -10,6 +10,11 @@
 #
 # 需要以下 LLM 参数（写在 .env）：
 #   MEMORY_LLM_BASE_URL / MEMORY_LLM_API_KEY / MEMORY_LLM_MODEL
+#
+# 可选：若想让 knowledge（wiki 抽取/总结）用独立于 memory 的 LLM 端点，
+# 在 .env 额外设 MEMORY_HUB_LLM_BASE_URL / MEMORY_HUB_LLM_API_KEY /
+# MEMORY_HUB_LLM_MODEL —— 未设则回落 MEMORY_LLM_*（默认同一端点）。
+# 典型用法：memory 对话提取留本地 Spark，wiki 抽取指向云端强模型。
 
 set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -103,10 +108,11 @@ $DOCKER run -d --name "$CONTAINER" \
   -e REMOTE_INSTANCE_PROXY_URL="$MEMORY_HUB_PROXY_PUBLIC_URL" \
   -e LLM_MODE=custom \
   -e LLM_PROTOCOL="${MEMORY_LLM_PROTOCOL:-openai}" \
-  -e LLM_API_KEY="$MEMORY_LLM_API_KEY" \
-  -e LLM_BASE_URL="$MEMORY_LLM_BASE_URL" \
-  -e LLM_MODEL="$MEMORY_LLM_MODEL" \
+  -e LLM_API_KEY="${MEMORY_HUB_LLM_API_KEY:-$MEMORY_LLM_API_KEY}" \
+  -e LLM_BASE_URL="${MEMORY_HUB_LLM_BASE_URL:-$MEMORY_LLM_BASE_URL}" \
+  -e LLM_MODEL="${MEMORY_HUB_LLM_MODEL:-$MEMORY_LLM_MODEL}" \
   -e KNOWLEDGE_LLM_BINDING_SYNC=0 \
+  -e KNOWLEDGE_WIKI_INGEST_CONCURRENCY="${KNOWLEDGE_WIKI_INGEST_CONCURRENCY:-1}" \
   "$MEMORY_HUB_IMAGE" >/dev/null
 
 wait_healthy "$CONTAINER" 120
