@@ -147,7 +147,7 @@ llm:
   apiKey: "${MEMORY_LLM_API_KEY:-}"
   model: "${MEMORY_LLM_MODEL:-}"
   maxTokens: 32000
-  timeoutMs: 300000
+  timeoutMs: ${MEMORY_LLM_TIMEOUT_MS:-1800000}
 
 memory:
   # promptMode: code（默认，代码工程场景，抽取项目事实/任务/决策/SOP/禁忌等团队共享记忆）
@@ -180,7 +180,12 @@ memory:
   # 此处保持同值仅为可读性；插件/SDK 形态才读这个字段。
   storeBackend: ${MEMORY_CORE_STORE_MODE}
   embedding:
-    provider: none
+    provider: openai
+    baseUrl: "${MEMORY_EMBED_BASE_URL:-${MEMORY_LLM_BASE_URL:-}}"
+    apiKey: "${MEMORY_EMBED_API_KEY:-${MEMORY_LLM_API_KEY:-}}"
+    model: "${MEMORY_EMBED_MODEL:-Qwen3-Embedding-0.6B-GGUF}"
+    dimensions: ${MEMORY_EMBED_DIMENSIONS:-1024}
+    sendDimensions: false
 
 # ── Skill 模块 ──
 skill:

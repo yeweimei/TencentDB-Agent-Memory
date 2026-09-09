@@ -777,7 +777,7 @@ export async function handleChatCompletions(
   // hermes / openclaw 走 header 预选身份, dsh headless 无 ask_user_question tool —
   // 三者都没有交互式 form UI 可以弹,reset 后 session 会永远卡在 pending_asset_confirm。
   // 直接返回"不支持"文案。
-  const _headerOnlyAgents = new Set(["hermes", "openclaw"]);
+  const _headerOnlyAgents = new Set(["hermes", "openclaw", "deepseek"]);
   const _noFormAgent = _headerOnlyAgents.has(agentSource) || _dshHeadless;
   if (!isAuxiliary && _noFormAgent) {
     const { isSessionResetCommand } = await import("./mem-command/pre-intercept.js");

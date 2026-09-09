@@ -76,6 +76,29 @@ fi
 bool() { [[ "$1" == "1" ]] && echo "true" || echo "false"; }
 
 info "生成 proxy config → $CONFIG_FILE  (auth=$(bool $PROXY_ENABLE_AUTH) session-init=$(bool $PROXY_ENABLE_SESSION_INIT) tdai=$(bool $PROXY_ENABLE_TDAI))"
+
+# ── Per-Agent 上游覆盖 ──────────────────────────────────────────────────────
+# 默认无（=空表，所有请求走外层 upstream.url）。需要把某个 agent 路径路由到
+# 别的上游时用分号分隔的多组 "agent=url|apiKey"（apiKey 可省略 → 透传客户端 key）:
+#   PROXY_UPSTREAM_AGENTS='deepseek=https://api.deepseek.com|sk-xxxx;other=https://...|key'
+PROXY_UPSTREAM_AGENTS_YAML=""
+if [[ -n "${PROXY_UPSTREAM_AGENTS:-}" ]]; then
+  PROXY_UPSTREAM_AGENTS_YAML=$'  agents:'
+  IFS=';' read -r -a _agent_entries <<< "$PROXY_UPSTREAM_AGENTS"
+  for _entry in "${_agent_entries[@]}"; do
+    _name="${_entry%%=*}"
+    _rest="${_entry#*=}"
+    _url="${_rest%%|*}"
+    _key="${_rest#*|}"
+    PROXY_UPSTREAM_AGENTS_YAML+=$'\n    '"$_name:"
+    PROXY_UPSTREAM_AGENTS_YAML+=$'\n      url: '"\"$_url\""
+    if [[ -n "$_key" ]]; then
+      PROXY_UPSTREAM_AGENTS_YAML+=$'\n      apiKey: '"\"$_key\""
+    fi
+  done
+  info "per-agent upstream: ${PROXY_UPSTREAM_AGENTS}"
+fi
+
 cat > "$CONFIG_FILE" <<YAML
 # 由 start-proxy.sh 自动生成 —— 每次启动覆盖，请不要手动改。
 server:
@@ -86,6 +109,7 @@ server:
 upstream:
   url: "${PROXY_UPSTREAM_URL}"
   apiKey: "${PROXY_UPSTREAM_API_KEY}"
+${PROXY_UPSTREAM_AGENTS_YAML}
 
 log:
   file: ""

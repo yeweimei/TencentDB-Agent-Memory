@@ -74,7 +74,7 @@ export function extractSpaceIdFromPath(path: string): string | null {
   if (match) {
     const agent = safePath.split("/").filter(Boolean)[0] ?? "";
     // Only capture spaceId when the first segment looks like an agent name
-    if (/^(claude-code|codebuddy|codex|cursor|hermes|openclaw|workbuddy|dsh|opencode|pi)$/i.test(agent)) {
+    if (/^(claude-code|codebuddy|codex|cursor|hermes|openclaw|workbuddy|dsh|opencode|pi|deepseek)$/i.test(agent)) {
       return match[1] || null;
     }
   }
@@ -308,6 +308,12 @@ export async function tryReportCreditFromPath(
   // reach this function, but this guard ensures future refactors cannot
   // accidentally bill extension consumption to the caller's memory space.
   if (event === "analyzer_usage") {
+    return { attempted: false, ok: false };
+  }
+
+  // No endpoint configured (deployments without a MemoryPlus/credit service):
+  // skip reporting entirely instead of POSTing to a placeholder/default URL.
+  if (!config?.url) {
     return { attempted: false, ok: false };
   }
 

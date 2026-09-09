@@ -69,7 +69,10 @@ export const DEFAULT_CONFIG: ProxyConfig = {
     options: {},
   },
   creditReport: {
-    url: "http://gateway.example.com:8000/UpdateMemoryPlusUsage",
+    // No default endpoint: deployments without a MemoryPlus/credit service
+    // should stay silent (credit-reporter skips when url is empty) instead of
+    // POSTing usage to a placeholder host.
+    url: "",
     timeoutMs: 5000,
   },
   creditPricing: { models: [] },
