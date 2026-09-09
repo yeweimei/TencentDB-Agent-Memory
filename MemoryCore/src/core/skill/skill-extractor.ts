@@ -381,8 +381,9 @@ export class SkillExtractor {
       enableTools: false,
       // 让 runner 别真跑 tool loop, 就当一次普通 completion 用。
       maxIterations: 1,
-      // 关键词很短; 32 token 足够 5 词 ×~6 字符 CJK, 也帮 runner 快速返回。
-      maxTokens: 64,
+      // thinking 模型（如 Spark-X2.5-4B / Qwen 系）在 64 token 时思考阶段就被截断，
+      // 常无实际关键词输出。调大到 8192 让推理+输出都缓冲完整。（2026-09-09）
+      maxTokens: 8192,
       taskId: `skill-extract-query-${input.task_id ?? "unknown"}`,
       // Langfuse 上可按此 traceName 单独筛这类 query-gen call, 跟主 skill.extract 分开。
       traceName: "skill.extract.query-gen",
