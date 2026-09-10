@@ -30,6 +30,37 @@ import type {
 } from "../../core/types.js";
 import type { LLMUsage } from "../../core/report/metric-tracking-runner.js";
 
+/**
+ * 构造一个注入请求体的 fetch 包装：把环境变量 LLM_PROVIDER_OPTIONS 里的
+ * providerOptions.openai.body 合并进请求体（仅作用于 JSON 字符串 body）。
+ * 未配置/非法时返回 undefined，调用按原样进行。
+ */
+function buildBodyInjectFetch(): typeof fetch | undefined {
+  let extra: Record<string, unknown> | undefined;
+  try {
+    const raw = process.env.LLM_PROVIDER_OPTIONS;
+    if (raw && raw.trim()) {
+      const parsed = JSON.parse(raw) as { openai?: { body?: Record<string, unknown> } };
+      const body = parsed?.openai?.body;
+      if (body && typeof body === "object") extra = body;
+    }
+  } catch {
+    // 非法 JSON 忽略，不影响主流程
+  }
+  if (!extra) return undefined;
+  return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    try {
+      if (init && typeof init.body === "string") {
+        const merged = { ...(JSON.parse(init.body) as Record<string, unknown>), ...extra };
+        init = { ...init, body: JSON.stringify(merged) };
+      }
+    } catch {
+      // 解析失败则原样发送
+    }
+    return fetch(input, init);
+  }) as typeof fetch;
+}
+
 const TAG = "[memory-tdai] [standalone-runner]";
 
 // Max iterations in the tool-call loop to prevent infinite loops
@@ -301,10 +332,16 @@ export class StandaloneLLMRunner implements LLMRunner {
     // Create OpenAI-compatible provider via AI SDK
     // Use "compatible" mode to call /chat/completions (not Responses API),
     // which works with all OpenAI-compatible backends (DeepSeek, Qwen, etc.)
+    // providerOptions→请求体注入：把 LLM_PROVIDER_OPTIONS 中的
+    // providerOptions.openai.body 合并进 /chat/completions 请求体。
+    // 用于透传模型专属参数（如 MiniMax-M3 的 thinking / reasoning_split），
+    // 不硬编码请求体——换 API 时只改环境变量，调用层不动。
+    const bodyInjectFetch = buildBodyInjectFetch();
     const provider = createOpenAI({
       baseURL: this.config.baseUrl,
       apiKey: this.config.apiKey,
       compatibility: "compatible",
+      ...(bodyInjectFetch ? { fetch: bodyInjectFetch } : {}),
     });
 
     // Select tools based on mode + storage

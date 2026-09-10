@@ -38,6 +38,13 @@ export interface RawLlmConfig {
    * 完整文本"的兼容层。
    */
   stream?: boolean;
+  /**
+   * 透传给 AI SDK 的 providerOptions（模型专属参数，见 @ai-sdk/openai /
+   * @ai-sdk/anthropic 文档）。例如让 MiniMax-M3 保留思考并拆分到独立字段：
+   *   { openai: { body: { thinking: { type: "adaptive" }, reasoning_split: true } } }
+   * 走 providerOptions 而不是硬编码请求体：换 API/供应商时只改这里，调用层不动。
+   */
+  providerOptions?: Record<string, unknown>;
 }
 
 /** 归一化后的配置。 */
@@ -49,6 +56,7 @@ export interface NormalizedLlmConfig {
   maxTokens: number;
   timeoutMs: number;
   stream: boolean;
+  providerOptions?: Record<string, unknown>;
 }
 
 const DEFAULT_MODEL = "Memory-Model";
@@ -71,7 +79,7 @@ export function normalizeLlmConfig(raw: RawLlmConfig | undefined): NormalizedLlm
   const maxTokens = cfg.maxTokens ?? cfg.maxContextSize ?? DEFAULT_MAX_TOKENS;
   const timeoutMs = cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const stream = cfg.stream ?? false;
-  return { protocol, baseUrl, apiKey, model, maxTokens, timeoutMs, stream };
+  return { protocol, baseUrl, apiKey, model, maxTokens, timeoutMs, stream, providerOptions: cfg.providerOptions };
 }
 
 export interface ChatParams {
@@ -94,6 +102,31 @@ export interface LlmClient {
 }
 
 /**
+ * 从 providerOptions.openai.body 构造一个注入请求体的 fetch 包装。
+ * AI SDK 的 openai chat 模型不支持任意 body 透传，故用 fetch 钩子在
+ * /chat/completions 请求体里合并额外字段（如 MiniMax 的 thinking / reasoning_split）。
+ * 未配置/非法时返回 undefined，请求按原样进行。
+ */
+function buildBodyInjectFetch(
+  providerOptions: Record<string, unknown> | undefined,
+): typeof fetch | undefined {
+  const openai = providerOptions?.openai as { body?: Record<string, unknown> } | undefined;
+  const extra = openai?.body;
+  if (!extra || typeof extra !== "object") return undefined;
+  return (async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+    try {
+      if (init && typeof init.body === "string") {
+        const merged = { ...(JSON.parse(init.body) as Record<string, unknown>), ...extra };
+        init = { ...init, body: JSON.stringify(merged) };
+      }
+    } catch {
+      // 解析失败则原样发送
+    }
+    return fetch(input, init);
+  }) as typeof fetch;
+}
+
+/**
  * 基于 AI SDK 的真实客户端。纯文本输出（不挂任何 tool，避免弱模型幻觉 tool call）。
  */
 export function createLlmClient(raw: RawLlmConfig | undefined): LlmClient {
@@ -112,9 +145,14 @@ export function createLlmClient(raw: RawLlmConfig | undefined): LlmClient {
   }
 
   // 按 protocol 选 AI SDK provider 工厂（两者都实现 LanguageModelV3 接口）。
+  const bodyInjectFetch = buildBodyInjectFetch(config.providerOptions);
   const provider = config.protocol === "anthropic"
     ? createAnthropic({ baseURL: config.baseUrl, apiKey: config.apiKey })
-    : createOpenAI({ baseURL: config.baseUrl, apiKey: config.apiKey });
+    : createOpenAI({
+        baseURL: config.baseUrl,
+        apiKey: config.apiKey,
+        ...(bodyInjectFetch ? { fetch: bodyInjectFetch } : {}),
+      });
 
   return {
     config,
@@ -145,6 +183,9 @@ export function createLlmClient(raw: RawLlmConfig | undefined): LlmClient {
           maxOutputTokens: params.maxOutputTokens ?? config.maxTokens,
           ...(params.temperature !== undefined ? { temperature: params.temperature } : {}),
           abortSignal: signal,
+          ...(config.providerOptions
+            ? { providerOptions: config.providerOptions }
+            : {}),
           experimental_telemetry: {
             isEnabled: true,
             functionId: params.label ?? "chat",

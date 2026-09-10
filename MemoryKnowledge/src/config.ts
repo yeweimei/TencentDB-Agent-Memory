@@ -41,6 +41,12 @@ export interface LlmConfig {
    * 个别只接受流式请求的兼容上游需置 true。per-instance binding 不覆盖此字段(部署级开关)。
    */
   stream?: boolean;
+  /**
+   * 透传给 AI SDK 的 providerOptions（模型专属参数）。例如 MiniMax-M3 保留思考并
+   * 拆分：{ openai: { body: { thinking: { type: "adaptive" }, reasoning_split: true } } }。
+   * 走 providerOptions 而非硬编码：换 API 只改这里，调用层不动。
+   */
+  providerOptions?: Record<string, unknown>;
 }
 
 export interface ClickHouseTelemetryConfig {
@@ -170,6 +176,24 @@ export function loadConfig(): ServiceConfig {
       maxTokens: envInt("LLM_MAX_TOKENS", 32768),
       timeoutMs: envInt("LLM_TIMEOUT_MS", 1200000),
       stream: process.env.LLM_STREAM === "true",
+      providerOptions: parseProviderOptions(process.env.LLM_PROVIDER_OPTIONS),
     },
   };
+}
+
+/**
+ * 解析 LLM_PROVIDER_OPTIONS（JSON 字符串）为 providerOptions 对象。
+ * 非法/空返回 undefined（透传层自动跳过）。例如 MiniMax-M3 保留思考并拆分：
+ *   {"openai":{"body":{"thinking":{"type":"adaptive"},"reasoning_split":true}}}
+ */
+function parseProviderOptions(raw: string | undefined): Record<string, unknown> | undefined {
+  if (!raw || !raw.trim()) return undefined;
+  try {
+    const parsed = JSON.parse(raw.trim());
+    return parsed && typeof parsed === "object" ? parsed : undefined;
+  } catch {
+    // 非法 JSON 不致命——记录后按未配置处理，避免启动失败。
+    console.warn("[config] LLM_PROVIDER_OPTIONS 不是合法 JSON，已忽略:", raw.slice(0, 80));
+    return undefined;
+  }
 }

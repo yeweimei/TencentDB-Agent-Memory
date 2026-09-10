@@ -143,9 +143,9 @@ data:
   baseDir: /data/tdai-memory
 
 llm:
-  baseUrl: "${MEMORY_LLM_BASE_URL:-}"
-  apiKey: "${MEMORY_LLM_API_KEY:-}"
-  model: "${MEMORY_LLM_MODEL:-}"
+  baseUrl: "${MEMORY_CORE_LLM_BASE_URL:-$MEMORY_LLM_BASE_URL}"
+  apiKey: "${MEMORY_CORE_LLM_API_KEY:-$MEMORY_LLM_API_KEY}"
+  model: "${MEMORY_CORE_LLM_MODEL:-$MEMORY_LLM_MODEL}"
   maxTokens: 32000
   timeoutMs: ${MEMORY_LLM_TIMEOUT_MS:-1800000}
 
@@ -219,6 +219,7 @@ $DOCKER run -d --name "$CONTAINER" \
   -e TDAI_GATEWAY_API_KEY="$MEMORY_CORE_GATEWAY_API_KEY" \
   -e TDAI_DATA_DIR=/data/tdai-memory \
   -e STORE_MODE="$MEMORY_CORE_STORE_MODE" \
+  -e LLM_PROVIDER_OPTIONS="${MEMORY_CORE_LLM_PROVIDER_OPTIONS:-}" \
   ${MONGO_ENV_ARGS[@]+"${MONGO_ENV_ARGS[@]}"} \
   "$MEMORY_CORE_IMAGE" >/dev/null
 
