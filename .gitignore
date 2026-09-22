@@ -139,3 +139,8 @@ MemoryCore/scripts/bench-l0-mongo/reports/
 # Local-only: parity snapshots & runtime configs (never commit)
 MemoryProxy/.archive-tmp/
 z_config/
+
+# 本机部署配置：内含明文密钥，仅保留在本地（同目录 .env 亦为忽略项）
+deploy/global-images/docker-compose.yml
+# 资产导入运行时状态
+.asset-import-state.json

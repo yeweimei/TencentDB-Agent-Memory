@@ -119,6 +119,9 @@ $DOCKER run -d --name "$CONTAINER" \
   -e LLM_PROVIDER_OPTIONS="${MEMORY_HUB_LLM_PROVIDER_OPTIONS:-}" \
   -e KNOWLEDGE_LLM_BINDING_SYNC=0 \
   -e KNOWLEDGE_WIKI_INGEST_CONCURRENCY="${KNOWLEDGE_WIKI_INGEST_CONCURRENCY:-1}" \
+  -e HTTP_PROXY="${MEMORY_HUB_HTTP_PROXY-http://host.docker.internal:7897}" \
+  -e HTTPS_PROXY="${MEMORY_HUB_HTTPS_PROXY-${MEMORY_HUB_HTTP_PROXY-http://host.docker.internal:7897}}" \
+  -e NO_PROXY="${MEMORY_HUB_NO_PROXY-localhost,127.0.0.1,::1,memory-core,memory-hub,tdai-memory-core,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12}" \
   "$MEMORY_HUB_IMAGE" >/dev/null
 
 wait_healthy "$CONTAINER" 120
